@@ -1,0 +1,163 @@
+# Plot function for Formal, Informal, No Digital Proxies in SG
+create_proxy_plot <- function(data, title, fill_colors, output_filename) {
+  # use ggplot to make barplot
+  plot <- ggplot(data, aes(x = Proxy, y = Percent, fill = Proxy)) +
+    # draw bar plot with grouping
+    geom_bar(stat = "identity", position = "dodge") +
+    # add percentage on bars
+    geom_text(aes(label = paste0(Percent, "%"), y = Percent + 1), position = position_dodge(width = 1.0), vjust = 0) +
+    # add count on bars
+    geom_text(aes(label = Number, y = Percent - 6), position = position_dodge(width = 0.9), vjust = 0) +
+    # add title, x-aixs, y-axis labels
+    labs(title = title,
+         x = "Proxy Type",
+         y = "Percentage and Count of Digital Proxies in SG") +
+    # fill colors
+    scale_fill_manual(values = fill_colors) +
+    theme_minimal()
+  # save the plot into a file
+  ggsave(output_filename, plot = plot, width = 10, height = 8, dpi = 300)
+}
+
+# Function for plotting ROC and AUC
+plot_roc_and_auc <- function(model, new_data, response_var, plot_title, output_filename) {
+  # predict probabilities based on the model
+  predicted_probabilities <- predict(model, new_data, type = "response")
+  # make prediction object based on predict probabilities
+  prediction_obj <- prediction(predicted_probabilities, new_data[[response_var]])
+  # make performance object for ROC curve based on prediction object
+  performance_obj <- performance(prediction_obj, "tpr", "fpr")
+  # save as jpeg file
+  jpeg(output_filename, width = 10, height = 8, units = "in", res = 300)
+  # plot ROC curve
+  plot(performance_obj, main = plot_title, col = "blue", lwd = 2,
+       xlab = "False Positive Rate", ylab = "True Positive Rate")
+  # calculate AUC value
+  auc_obj <- performance(prediction_obj, "auc")
+  auc_value <- unlist(slot(auc_obj, "y.values"))
+  cat("AUC:", auc_value, "\n")
+  text(0.6, 0.4, paste("AUC =", round(auc_value, 3)), col = "red", cex = 1.2)
+  dev.off()
+}
+
+# Function to plot bar plots with trend lines
+plot_barplot <- function(data, x_var, y_var, group_var, x_labels, fill_colors, trend_colors, title, x_lab, y_lab, output_filename) {
+  # recode variable with specified labels
+  data[[x_var]] <- factor(data[[x_var]], levels = names(x_labels), labels = x_labels)
+  # use ggplot to make barplot
+  p <- ggplot(data, aes_string(x = x_var, y = y_var, group = group_var)) +
+    # draw bar plot with grouping
+    geom_bar(aes_string(fill = group_var), stat = 'identity', position = position_dodge(width = 0.8)) +
+    # fill colors
+    scale_fill_manual(values = fill_colors) +
+    # add a linear trend line to show the increasing or decreasing of trend
+    geom_smooth(aes_string(color = group_var), method = "lm", se = FALSE, linetype = "dashed", size = 1) +
+    # add text labels on bars
+    geom_text(aes_string(label = paste0(sprintf("%.1f%%", get(y_var))), fill = group_var),
+              position = position_dodge(width = 0.8), vjust = -0.5, size = 3) +
+    # make trend line colors corresponding to bar color
+    scale_color_manual(values = trend_colors) +
+    theme_minimal() +
+    # ensure text size
+    theme(axis.text.x = element_text(hjust = 1, size = 12)) +
+    labs(title = title, x = x_lab, y = y_lab) +
+    guides(fill = guide_legend(title = group_var), color = guide_legend(title = group_var))
+  # save the plot into a file
+  ggsave(output_filename, plot = p, width = 10, height = 8, dpi = 300)
+}
+
+# function for plotting box plots
+generate_boxplot <- function(data, value_col, output_filename) {
+  # make the dataset into long data format
+  long_data <- data %>%
+    pivot_longer(cols = c(FinanceDelegate1, MedicalDelegate1), 
+                 names_to = "Type", 
+                 values_to = "Delegate", 
+                 values_drop_na = TRUE) %>%
+    filter(Delegate == 1) %>%
+    select(-Delegate)
+  # calculate IQR values for each type
+  iqr_values <- long_data %>% group_by(Type) %>%
+    summarise(Q1 = quantile(!!sym(value_col), 0.25), Q3 = quantile(!!sym(value_col), 0.75), IQR = IQR(!!sym(value_col))) %>%
+    ungroup()
+  # function to check whether this value is an outlier (< lower bound or > upper bound)
+  is_outlier <- function(value, type) {
+    iqr_row <- iqr_values %>% filter(Type == type)
+    lower_bound <- iqr_row$Q1 - 1.5 * iqr_row$IQR
+    upper_bound <- iqr_row$Q3 + 1.5 * iqr_row$IQR
+    value < lower_bound | value > upper_bound
+  }
+  # mark outliers using mapply
+  long_data <- long_data %>%
+    mutate(Outlier = mapply(is_outlier, !!sym(value_col), Type))
+  # draw barplot
+  boxplot <- ggplot(long_data, aes(x = Type, y = !!sym(value_col))) +
+    geom_boxplot() +
+    geom_text(
+      aes(label = ifelse(Outlier, as.character(!!sym(value_col)), "")),
+      position = position_dodge(width = 0.25), hjust = -0.3, vjust = 0, size = 2
+    ) +
+    theme_minimal() +
+    xlab("Types of Digital Proxies") +
+    ylab(value_col) +
+    # ensure text size
+    scale_x_discrete(labels = c("FinanceDelegate1" = "Finance", "MedicalDelegate1" = "Medical")) +
+    coord_flip()
+  ggsave(output_filename, plot = boxplot, width = 10, height = 8, dpi = 300)
+}
+
+
+# function for plotting BEHAVIORS OF DIGITAL PROXIES
+plot_delegation_reasons <- function(response_order, cleaned_data_finance, cleaned_data_medical, output_filename) {
+  # add delegateType column to the datasets
+  cleaned_data_finance$delegateType <- 'Finance'
+  cleaned_data_medical$delegateType <- 'Medical'
+  # combine two dataset
+  combined_data <- rbind(cleaned_data_finance, cleaned_data_medical)
+  # filter all NAs
+  combined_data <- combined_data %>% filter(!is.na(Response) & Response != "NA")
+  # calculate counts of each response by delegateType (use groupby function)
+  combined_counts <- combined_data %>%
+    group_by(Response, delegateType) %>%
+    summarise(Count = n()) %>%
+    ungroup()
+  # filter all NAs
+  combined_counts <- combined_counts %>% filter(!is.na(Response) & Response != "NA")
+  # recode the Response variable
+  combined_counts$Response <- factor(combined_counts$Response, levels = response_order)
+  # draw barplot
+  manage_account <- ggplot(combined_counts, aes(x = Response, y = Count, fill = delegateType)) +
+    geom_bar(stat = 'identity', position = position_dodge(width = 0.9)) +
+    # add counts on bars
+    geom_text(aes(label = Count), vjust = -0.3, position = position_dodge(width = 0.9), size = 2.5) +
+    theme_minimal() +
+    # ensure plot margins and text
+    theme(plot.margin = unit(c(1, 1, 4, 1), "lines")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) +
+    # add x-axis, y-axis
+    labs(x = 'Reasons for Assisting Delegators with Digital Services', y = 'Counts of Digital Proxies') +
+    scale_fill_manual(values = c('Finance' = 'darkgreen', 'Medical' = 'darkblue'))
+  ggsave(output_filename, plot = manage_account, width = 10, height = 8, dpi = 300)
+}
+
+
+# function for plotting Distribution among financial digital proxies, normalized across practice type
+create_proxy_plot_new <- function(counts, delegate_column, fill_colors, x_label, y_label, legend_title, output_filename) {
+  # make barplot with AgeGender on the x-axis and Count on the y-axis
+  proxy_plot <- ggplot(counts, aes(x = AgeGender, y = Count, fill = !!sym(delegate_column))) +
+    # draw bar plot with grouping
+    geom_bar(stat = 'identity', position = position_dodge(width = 0.8)) +
+    # fill colors
+    scale_fill_manual(values = fill_colors) +
+    # text labels on bars
+    geom_text(aes(label = paste0("#", Count)),
+              position = position_dodge(width = 0.8), vjust = -0.25, size = 3) +
+    theme_minimal() +
+    # make x-axis, y-axis labels
+    labs(x = x_label, y = y_label, fill = legend_title) +
+    # ensure legend title
+    guides(fill = guide_legend(title = legend_title))
+  
+  ggsave(output_filename, plot = proxy_plot, width = 10, height = 8, dpi = 300)
+}
+
