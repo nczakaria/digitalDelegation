@@ -6,3 +6,4 @@ The Research Questions are for SG, What is the prevalence of digital proxies? Wh
 Based on these research questions, we need to understand variations in human behavior as digitizing this service could potentially be influenced by culturally-driven reasons and provide insights in a call to action to empower digital proxies when caring for their vulnerable person.
 From this research, we know who are the ones participating in the Digital Proxies and how they are engaging in digital proxies' methods. We can now look into the second step of seeing how we can develop policies to promote better usage of digital practices. How we can educate people better in SG to make sure financial and medical digital practices can be done in an ethical manner.
 
+https://github.com/user-attachments/assets/19ccd94e-f0b6-46ce-af81-007a4888505c
