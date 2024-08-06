@@ -1,7 +1,7 @@
 # digitalDelegation
 
 
-![Project Digital Delegation](https://github.com/user-attachments/assets/6209239b-8bac-474a-b433-9799fd97741d)
+![Project Digital Delegation](https://github.com/user-attachments/assets/dee14320-20b8-4653-a571-9b8eaf2843f1)
 
 
 Demographic and physical care: https://github.com/user-attachments/assets/130815ce-1c27-45ab-afd7-edcdf296591d
